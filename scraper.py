@@ -1,23 +1,22 @@
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
-import re
+import re 
 import datetime
 
-def get_starting_lineup(player1, player2, player3, player4, player5):
-	lineup = set([player1, player2, player3, player4, player5])
-	return lineup
-
-def scrape(splited_text):
+def scrape(splited_text, points_scored=0, points_allowed=0):
 	#text = str(soup.find_all("span")[1].text)
 	RICE_IS_HOME = True
-	current_lineup = get_starting_lineup("Koulechov", "Drone", "Guercy", "Cashaw","Evans")
+	current_lineup = set(["Koulechov", "Drone", "Guercy", "Cashaw","Evans"])
 	#print current_lineup
 	current_stint = {"lineup": tuple(current_lineup), "points scored": 0, "points allowed": 0,
 					"begin time": datetime.timedelta(0, 0, minutes=20), "end time": datetime.timedelta(0, 0, minutes=20),
-					"lasting time": None}
+					"lasting time": None, "initial points scored": points_scored, "initial points allowed": points_allowed}
 	#print current_stint
 	pattern = re.compile(":[^A-Za-z]+")
+	score_pattern = re.compile("[0-9]-[0-9]")
 	stints = []
+	home_score = 0
+	away_score = 0
 	for line in splited_text:
 		#print line, splited_text.index(line), "of", len(splited_text), splited_text.index(line) == len(splited_text) - 9
 	 	is_log = re.search(pattern, line)
@@ -25,7 +24,19 @@ def scrape(splited_text):
 	 		splited_line = line.split()
 	 		#print splited_line
 			for element in splited_line:
+				is_score = re.search(score_pattern, element)
 			 	is_time = re.search(pattern, element)
+			 	if is_score:
+			 		current_score = element
+			 		dash_index = current_score.index("-")
+			 		home_score = int(current_score[:dash_index])
+			 		away_score = int(current_score[dash_index+1:])
+			 		if RICE_IS_HOME:
+			 			current_stint["points scored"] = home_score - current_stint["initial points scored"]
+			 			current_stint["points allowed"] = away_score - current_stint["initial points allowed"]
+			 		else:
+			 			current_stint["points allowed"] = home_score - current_stint["initial points allowed"]
+			 			current_stint["points scored"] = away_score - current_stint["initial points scored"]
 			 	if is_time:
 			 		#print current_stint["lineup"]
 			 		game_time_index = splited_line.index(element)
@@ -54,7 +65,13 @@ def scrape(splited_text):
 											"begin time": datetime.timedelta(0, game_time.total_seconds()),
 											"end time": datetime.timedelta(0, game_time.total_seconds()),
 											"lasting time": None}
-			 				# if tuple(current_lineup) in stints:
+							if RICE_IS_HOME:
+								current_stint["initial points scored"] = home_score
+								current_stint["initial points allowed"] = away_score
+							else:
+								current_stint["initial points scored"] = away_score
+								current_stint["initial points allowed"] = home_score
+							# if tuple(current_lineup) in stints:
 			 				# 	stints[tuple(current_lineup)]["time"] += game_time
 			 				# else:
 			 				#  	stints[tuple(current_lineup)] = {"points scored": 0, "points allowed": 0,
@@ -63,6 +80,8 @@ def scrape(splited_text):
 	# Because the end time isn't counted until 0:00 usually.
 	current_stint["lasting time"] = current_stint["begin time"]
 	stints.append(current_stint)
+	# for stint in stints:
+	# 	print stint["points scored"], stint["points allowed"]
 	return stints
 	# total_time = 0
 	# for stint in stints:
@@ -88,10 +107,10 @@ def format_stints(stints):
 		stint["lasting time"] = str(stint["lasting time"])
 		del stint["begin time"]
 		del stint["end time"]
-	print datetime.timedelta(seconds=total_time)
+	#print datetime.timedelta(seconds=total_time)
 	return new_stints
 
-def main():
+if __name__ == "__main__":
 	url = "http://www.riceowls.com/sports/m-baskbl/stats/2015-2016/rice0114.html"
 	soup = BeautifulSoup(urlopen(url), "html.parser")
 	# Get first half and second half texts 
@@ -101,23 +120,13 @@ def main():
 		is_divider = re.match("2nd PERIOD", line)
 		if is_divider:
 			divider_index = text.index(line)
-	# need to fix starting lineup problem
 	first_half_text = text[:divider_index]
 	second_half_text = text[divider_index:]
 
 	# Scrape them separately 
 	stint1 = scrape(first_half_text)
-	stint1.extend(scrape(second_half_text))
+	stint1.extend(scrape(second_half_text, 34, 35))
 	stint2 = format_stints(stint1)
-	for stint in stint2:
-		print stint["lineup"], stint["lasting time"]
-					
-main()
 
-# t0 = datetime.timedelta(0, seconds=50, minutes=5)
-# t1 = datetime.timedelta(0, seconds=55, minutes=3)
-# td = t0 - t1
-# print td
-# 1 Use timedelta instead of time to represent t in game.
-# 2 Given a new stint, get its t0 and t1, whose difference will tell us how long did the stint last on the court.
-# Instead of having multiple stints with the same lineup, we aggregate the minutes, points, etc. with one single stint, because ultimately that's what we want.
+	for stint in stint2:
+		print stint["lineup"], stint["lasting time"], stint["points scored"], "-", stint["points allowed"]
