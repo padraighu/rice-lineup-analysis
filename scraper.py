@@ -11,12 +11,14 @@ def scrape(splited_text, points_scored=0, points_allowed=0):
 	current_stint = {"lineup": tuple(current_lineup), "points scored": 0, "points allowed": 0,
 					"begin time": datetime.timedelta(0, 0, minutes=20), "end time": datetime.timedelta(0, 0, minutes=20),
 					"lasting time": None, "initial points scored": points_scored, "initial points allowed": points_allowed,
-					"field goal attempt": 0, "field goal made": 0}
+					"field goal attempt": 0, "field goal made": 0, "offensive rebound": 0, "defensive rebound": 0, "assist": 0}
 	#print current_stint
 	pattern = re.compile(":[^A-Za-z]+")
 	score_pattern = re.compile("[0-9]-[0-9]")
 	made_pattern = re.compile("GOOD!")
 	missed_pattern = re.compile("MISSED")
+	rebound_pattern = re.compile("REBOUND")
+	assist_pattern = re.compile("ASSIST")
 	stints = []
 	home_score = 0
 	away_score = 0
@@ -67,7 +69,8 @@ def scrape(splited_text, points_scored=0, points_allowed=0):
 			 				current_stint = {"lineup": tuple(current_lineup), "points scored": 0, "points allowed": 0,
 											"begin time": datetime.timedelta(0, game_time.total_seconds()),
 											"end time": datetime.timedelta(0, game_time.total_seconds()),
-											"lasting time": None, "field goal attempt": 0, "field goal made": 0}
+											"lasting time": None, "field goal attempt": 0, "field goal made": 0,
+											"offensive rebound": 0, "defensive rebound": 0, "assist": 0}
 							if RICE_IS_HOME:
 								current_stint["initial points scored"] = home_score
 								current_stint["initial points allowed"] = away_score
@@ -98,6 +101,32 @@ def scrape(splited_text, points_scored=0, points_allowed=0):
 				elif made_shot:
 					current_stint["field goal attempt"] += 1
 					current_stint["field goal made"] += 1
+				# Same logic.
+				# We don't count deadball rebounds because they are not included in the box score.
+				if re.match(rebound_pattern, element):
+					try:
+						off_reb = splited_line[splited_line.index(element)+1] == "(OFF)" and splited_line[splited_line.index(element)+3] != "(DEADBALL)" 
+						#print off_reb
+					except:
+						off_reb = False
+					try:
+						def_reb = splited_line[splited_line.index(element)+1] == "(DEF)" and splited_line[splited_line.index(element)+3] != "(DEADBALL)" 
+						#print def_reb
+					except:
+						def_reb = False
+					if off_reb:
+						#print "hello"
+						current_stint["offensive rebound"] += 1
+					elif def_reb:
+						#print "hi"
+						current_stint["defensive rebound"] += 1
+				try:
+					is_assist = re.match(assist_pattern, element) and element in splited_line
+				except:
+					is_assist = False
+				if is_assist:
+					current_stint["assist"] += 1
+
 	# The last lineup 
 	# Because the end time isn't counted until 0:00 usually.
 	current_stint["lasting time"] = current_stint["begin time"]
@@ -109,6 +138,12 @@ def scrape(splited_text, points_scored=0, points_allowed=0):
 	# for stint in stints:
 	# 	total_time += stint["lasting time"].total_seconds()
 	# print total_time  		 				
+
+def format_lineup(set_lineup):
+	string_lineup = ""
+	for player in set_lineup:
+		string_lineup = string_lineup + player + " "
+	return string_lineup[:-1]
 
 def format_stints(stints):
 	new_stints = []
@@ -122,17 +157,40 @@ def format_stints(stints):
 		 			new_stint["lasting time"] += stint["lasting time"]
 		 			new_stint["field goal attempt"] += stint["field goal attempt"]
 		 			new_stint["field goal made"] += stint["field goal made"]
+		 			new_stint["offensive rebound"] += stint["offensive rebound"]
+		 			new_stint["defensive rebound"] += stint["defensive rebound"]
+		 			new_stint["assist"] += stint["assist"]
 		else:
 			new_stints.append(dict(stint))
 			existing_lineups.append(set(stint["lineup"]))
 	total_time = 0
 	for stint in new_stints:
-		total_time += stint["lasting time"].total_seconds()
-		stint["lasting time"] = str(stint["lasting time"])
+		#total_time += stint["lasting time"].total_seconds()
+		stint["lineup"] = format_lineup(stint["lineup"])
+		stint["lasting time"] = str(stint["lasting time"])[2:]
+		stint["total rebound"] = stint["offensive rebound"] + stint["defensive rebound"]
+		stint["point diff."] = stint["points scored"] - stint["points allowed"]
 		del stint["begin time"]
 		del stint["end time"]
+		del stint["initial points scored"]
+		del stint["initial points allowed"]
 	#print datetime.timedelta(seconds=total_time)
 	return new_stints
+
+def csvify(stints):
+	csv_rows = [["Lineup", "Min", "Pts", "Oppo. Pts", "Diff.", "Fgm", "Fga", "Ast", "D-Reb", "O-Reb", "Reb"]]
+	for stint in stints:
+		csv_row = [stint["lineup"], stint["lasting time"], stint["points scored"], stint["points allowed"], stint["point diff."],
+					stint["field goal made"], stint["field goal attempt"],
+					stint["assist"], stint["defensive rebound"], stint["offensive rebound"],
+					stint["total rebound"]]
+		csv_rows.append(csv_row)
+	for row in csv_rows:
+		str_row = ""
+		for element in row:
+			str_row = str_row + str(element) + ", "
+		print str_row
+
 
 if __name__ == "__main__":
 	url = "http://www.riceowls.com/sports/m-baskbl/stats/2015-2016/rice0114.html"
@@ -148,9 +206,9 @@ if __name__ == "__main__":
 	second_half_text = text[divider_index:]
 
 	# Scrape them separately 
-	stint1 = scrape(first_half_text)
-	stint1.extend(scrape(second_half_text, 34, 35))
-	stint2 = format_stints(stint1)
-
-	for stint in stint2:
-		print stint["lineup"], stint["lasting time"], stint["points scored"], "-", stint["points allowed"], "FGM:", stint["field goal made"], "FGA:", stint["field goal attempt"]
+	raw_stints = scrape(first_half_text)
+	raw_stints.extend(scrape(second_half_text, 34, 35))
+	clean_stints = format_stints(raw_stints)
+	csvify(clean_stints)
+	# for stint in stint2:
+	# 	print stint["lineup"], stint["lasting time"], stint["points scored"], "-", stint["points allowed"], stint["point diff."], "FGM:", stint["field goal made"], "FGA:", stint["field goal attempt"], "REB:", stint["total rebound"], "AST:", stint["assist"]
