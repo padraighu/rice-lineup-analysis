@@ -10,10 +10,13 @@ def scrape(splited_text, points_scored=0, points_allowed=0):
 	#print current_lineup
 	current_stint = {"lineup": tuple(current_lineup), "points scored": 0, "points allowed": 0,
 					"begin time": datetime.timedelta(0, 0, minutes=20), "end time": datetime.timedelta(0, 0, minutes=20),
-					"lasting time": None, "initial points scored": points_scored, "initial points allowed": points_allowed}
+					"lasting time": None, "initial points scored": points_scored, "initial points allowed": points_allowed,
+					"field goal attempt": 0, "field goal made": 0}
 	#print current_stint
 	pattern = re.compile(":[^A-Za-z]+")
 	score_pattern = re.compile("[0-9]-[0-9]")
+	made_pattern = re.compile("GOOD!")
+	missed_pattern = re.compile("MISSED")
 	stints = []
 	home_score = 0
 	away_score = 0
@@ -64,7 +67,7 @@ def scrape(splited_text, points_scored=0, points_allowed=0):
 			 				current_stint = {"lineup": tuple(current_lineup), "points scored": 0, "points allowed": 0,
 											"begin time": datetime.timedelta(0, game_time.total_seconds()),
 											"end time": datetime.timedelta(0, game_time.total_seconds()),
-											"lasting time": None}
+											"lasting time": None, "field goal attempt": 0, "field goal made": 0}
 							if RICE_IS_HOME:
 								current_stint["initial points scored"] = home_score
 								current_stint["initial points allowed"] = away_score
@@ -76,6 +79,25 @@ def scrape(splited_text, points_scored=0, points_allowed=0):
 			 				# else:
 			 				#  	stints[tuple(current_lineup)] = {"points scored": 0, "points allowed": 0,
 								# 								"time": datetime.timedelta(0, 0, 0)}
+				# Because at this point splited_line is already chopped off. 
+				# But element is in the orginal splited_line, so it might be a miss or made shot 
+				# by the opponents, which we don't care.
+				# So if element is no longer in splited_line, it means that we don't want to record 
+				# the miss or made shot.
+				try:
+					missed_shot = re.match(missed_pattern, element) and splited_line[splited_line.index(element)+1] != "FT"
+				except:
+					missed_shot = False
+				try:
+					made_shot = re.match(made_pattern, element) and splited_line[splited_line.index(element)+1] != "FT"
+				except:
+					missed_shot = False 
+				if missed_shot:
+					# We don't want to count free throws.
+					current_stint["field goal attempt"] += 1
+				elif made_shot:
+					current_stint["field goal attempt"] += 1
+					current_stint["field goal made"] += 1
 	# The last lineup 
 	# Because the end time isn't counted until 0:00 usually.
 	current_stint["lasting time"] = current_stint["begin time"]
@@ -98,6 +120,8 @@ def format_stints(stints):
 		 			new_stint["points scored"] += stint["points scored"]
 		 			new_stint["points allowed"] += stint["points allowed"]
 		 			new_stint["lasting time"] += stint["lasting time"]
+		 			new_stint["field goal attempt"] += stint["field goal attempt"]
+		 			new_stint["field goal made"] += stint["field goal made"]
 		else:
 			new_stints.append(dict(stint))
 			existing_lineups.append(set(stint["lineup"]))
@@ -129,4 +153,4 @@ if __name__ == "__main__":
 	stint2 = format_stints(stint1)
 
 	for stint in stint2:
-		print stint["lineup"], stint["lasting time"], stint["points scored"], "-", stint["points allowed"]
+		print stint["lineup"], stint["lasting time"], stint["points scored"], "-", stint["points allowed"], "FGM:", stint["field goal made"], "FGA:", stint["field goal attempt"]
