@@ -3,10 +3,10 @@ from urllib2 import urlopen
 import re 
 import datetime
 
-def scrape(splited_text, points_scored=0, points_allowed=0):
+def scrape(splited_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
 	#text = str(soup.find_all("span")[1].text)
-	RICE_IS_HOME = True
-	current_lineup = set(["Koulechov", "Drone", "Guercy", "Cashaw","Evans"])
+	RICE_IS_HOME = rice_is_home
+	current_lineup = lineup
 	#print current_lineup
 	current_stint = {"lineup": tuple(current_lineup), "points scored": 0, "points allowed": 0,
 					"begin time": datetime.timedelta(0, 0, minutes=20), "end time": datetime.timedelta(0, 0, minutes=20),
@@ -51,7 +51,7 @@ def scrape(splited_text, points_scored=0, points_allowed=0):
 			 		current_stint["end time"] = game_time
 			 		current_stint["lasting time"] = current_stint["begin time"] - current_stint["end time"]
 			 		#print current_stint["lasting time"]
-			 		if RICE_IS_HOME:
+			 		if RICE_IS_HOME == True:
 			 			splited_line = splited_line[:game_time_index]
 			 		else:
 			 			splited_line = splited_line[game_time_index+1:]
@@ -60,11 +60,14 @@ def scrape(splited_text, points_scored=0, points_allowed=0):
 			 			player_name = str(splited_line[-2][:-1])
 			 			if splited_line[1] == "IN":
 			 				#print player_name, "checking in"
+			 				#print current_lineup
 			 				current_lineup.add(player_name)
 			 			elif splited_line[1] == "OUT:":
 			 				#print player_name, "checking out"
+			 				#print current_lineup
 			 				current_lineup.remove(player_name)
 			 			if len(current_lineup) == 5:
+			 				#print current_lineup
 			 				stints.append(current_stint)
 			 				current_stint = {"lineup": tuple(current_lineup), "points scored": 0, "points allowed": 0,
 											"begin time": datetime.timedelta(0, game_time.total_seconds()),
@@ -191,9 +194,7 @@ def csvify(stints):
 			str_row = str_row + str(element) + ", "
 		print str_row
 
-
-if __name__ == "__main__":
-	url = "http://www.riceowls.com/sports/m-baskbl/stats/2015-2016/rice0114.html"
+def run(url, half_time_points_scored, half_time_points_allowed, rice_is_home, lineup):
 	soup = BeautifulSoup(urlopen(url), "html.parser")
 	# Get first half and second half texts 
 	text = soup.find_all("span")[1].text.splitlines()
@@ -206,9 +207,18 @@ if __name__ == "__main__":
 	second_half_text = text[divider_index:]
 
 	# Scrape them separately 
-	raw_stints = scrape(first_half_text)
-	raw_stints.extend(scrape(second_half_text, 34, 35))
+	raw_stints = scrape(first_half_text, set(lineup), rice_is_home)
+	raw_stints.extend(scrape(second_half_text, set(lineup), rice_is_home, half_time_points_scored, half_time_points_allowed))
 	clean_stints = format_stints(raw_stints)
 	csvify(clean_stints)
 	# for stint in stint2:
 	# 	print stint["lineup"], stint["lasting time"], stint["points scored"], "-", stint["points allowed"], stint["point diff."], "FGM:", stint["field goal made"], "FGA:", stint["field goal attempt"], "REB:", stint["total rebound"], "AST:", stint["assist"]
+
+if __name__ == "__main__":
+	url = "http://www.riceowls.com/sports/m-baskbl/stats/2015-2016/rice1113.html"
+	hps = 31
+	hpa = 47
+	rice_is_home = False
+	starting_lineup = set(["Koulechov", "Drone", "Guercy", "Mency", "Evans"])
+	run(url, hps, hpa, rice_is_home, starting_lineup)
+	
