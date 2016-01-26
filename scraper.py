@@ -166,6 +166,7 @@ def format_stints(stints):
 	total_time = 0
 	for stint in new_stints:
 		stint["lineup"] = format_lineup(stint["lineup"])
+		total_time += stint["lasting time"].total_seconds()
 		stint["lasting time"] = str(stint["lasting time"])[2:]
 		stint["total rebound"] = stint["offensive rebound"] + stint["defensive rebound"]
 		stint["point diff."] = stint["points scored"] - stint["points allowed"]
@@ -173,6 +174,7 @@ def format_stints(stints):
 		del stint["end time"]
 		del stint["initial points scored"]
 		del stint["initial points allowed"]
+		#print datetime.timedelta(seconds=total_time)
 	return new_stints
 
 def csvify(stints):
@@ -208,10 +210,10 @@ def run(url, half_time_points_scored, half_time_points_allowed, rice_is_home, li
 	csvify(clean_stints)
 	
 if __name__ == "__main__":
-	url = "http://www.riceowls.com/sports/m-baskbl/stats/2015-2016/rice0101.html"
-	hps = 29	
-	hpa = 37
+	url = "http://www.riceowls.com/sports/m-baskbl/stats/2015-2016/rice0123.html"
+	hps = 25
+	hpa = 45
 	rice_is_home = False
-	starting_lineup = set(["Koulechov", "Drone", "Guercy", "Mency", "Evans"])
+	starting_lineup = set(["Koulechov", "Drone", "Guercy", "Cashaw", "Evans"])
 	run(url, hps, hpa, rice_is_home, starting_lineup)
 	
