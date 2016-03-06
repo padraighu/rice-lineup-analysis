@@ -174,7 +174,6 @@ def format_stints(stints):
 		del stint["end time"]
 		del stint["initial points scored"]
 		del stint["initial points allowed"]
-		#print datetime.timedelta(seconds=total_time)
 	return new_stints
 
 def csvify(stints):
@@ -191,7 +190,7 @@ def csvify(stints):
 			str_row = str_row + str(element) + ", "
 		print str_row
 
-def run(url, half_time_points_scored, half_time_points_allowed, rice_is_home, lineup):
+def run(url, half_time_points_scored, half_time_points_allowed, rice_is_home, lineup, overtime_points_scored=None):
 	soup = BeautifulSoup(urlopen(url), "html.parser")
 	# Get first half and second half texts 
 	text = soup.find_all("span")[1].text.splitlines()
@@ -203,17 +202,34 @@ def run(url, half_time_points_scored, half_time_points_allowed, rice_is_home, li
 	first_half_text = text[:divider_index]
 	second_half_text = text[divider_index:]
 
+	overtime = False
+	ot_pattern = re.compile('OT')
+	for text in second_half_text:
+		if re.match(ot_pattern, text):
+			overtime = True
+			ot_index = second_half_text.index(text)
+			ot_text = second_half_text[ot_index:]
+			ot_text = ot_text[5:]
+			second_half_text = second_half_text[:ot_index]
+
 	# Scrape them separately 
 	raw_stints = scrape(first_half_text, set(lineup), rice_is_home)
 	raw_stints.extend(scrape(second_half_text, set(lineup), rice_is_home, half_time_points_scored, half_time_points_allowed))
+	if overtime:
+		raw_stints.extend(scrape(ot_text, set(["Koulechov", "LETCHER-ELLIS", "Guercy", "Cashaw", "Evans"]), rice_is_home, overtime_points_scored, overtime_points_scored))
 	clean_stints = format_stints(raw_stints)
 	csvify(clean_stints)
 	
 if __name__ == "__main__":
-	url = "http://www.riceowls.com/sports/m-baskbl/stats/2015-2016/rice0123.html"
-	hps = 25
-	hpa = 45
+	url = "http://www.riceowls.com/sports/m-baskbl/stats/2015-2016/rice0225.html"
+	hps = 28
+	hpa = 30
 	rice_is_home = False
+	overtime = True
+	ops = 66
 	starting_lineup = set(["Koulechov", "Drone", "Guercy", "Cashaw", "Evans"])
-	run(url, hps, hpa, rice_is_home, starting_lineup)
+	if not overtime:
+		run(url, hps, hpa, rice_is_home, starting_lineup)
+	else:
+		run(url, hps, hpa, rice_is_home, starting_lineup, ops)
 	
