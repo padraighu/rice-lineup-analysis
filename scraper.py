@@ -3,7 +3,6 @@ from urllib2 import urlopen
 import re
 import datetime
 
-
 def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
     RICE_IS_HOME = rice_is_home
     current_lineup = lineup
@@ -20,8 +19,6 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
     score_pattern = re.compile("[0-9]-[0-9]")
     made_pattern = re.compile("GOOD!")
     missed_pattern = re.compile("MISSED")
-    #made_3_pattern = re.compile("GOOD! 3 PTR")
-    #missed_3_pattern = re.compile("MISSED 3 PTR")
     rebound_pattern = re.compile("REBOUND")
     assist_pattern = re.compile("ASSIST")
     block_pattern = re.compile("BLOCK")
@@ -36,7 +33,6 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
     for line in split_text:
         is_log = re.search(pattern, line)
         if is_log:
-            #print line
             split_line = line.split()
             chopped = False
             for element in split_line:
@@ -121,26 +117,31 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
                             current_stint["three point attempt"] += 1
                             current_stint["three point made"] += 1
 
-                    # TODO add 3pts 
                     if re.match(rebound_pattern, element):
-                        try:
+                        if element in rice_split_line:
                             off_reb = rice_split_line[rice_split_line.index(element) + 1] == "(OFF)" and rice_split_line[rice_split_line.index(element) + 3] != "(DEADBALL)"
-                        except:
-                            off_reb = False
-                        try:
                             def_reb = rice_split_line[rice_split_line.index(element) + 1] == "(DEF)" and rice_split_line[rice_split_line.index(element) + 3] != "(DEADBALL)"
-                        except:
-                            def_reb = False
-                        if off_reb:
-                            current_stint["offensive rebound"] += 1
-                        elif def_reb:
-                            current_stint["defensive rebound"] += 1
+                            if off_reb:
+                                    current_stint["offensive rebound"] += 1
+                            elif def_reb:
+                                current_stint["defensive rebound"] += 1
+                        elif element in opp_split_line:
+                            o_off_reb = opp_split_line[opp_split_line.index(element) + 1] == "(OFF)" and opp_split_line[opp_split_line.index(element) + 3] != "(DEADBALL)"
+                            o_def_reb = opp_split_line[opp_split_line.index(element) + 1] == "(DEF)" and opp_split_line[opp_split_line.index(element) + 3] != "(DEADBALL)"
+                            if o_off_reb:
+                                current_stint["o-rebounds allowed"] += 1
+                            elif o_def_reb:
+                                current_stint["d-rebounds allowed"] += 1
+
                     is_assist = re.match(assist_pattern, element)
                     if is_assist and element in rice_split_line:
                         current_stint["assist"] += 1
                     is_block = re.match(block_pattern, element)
-                    if is_block and element in rice_split_line:
-                        current_stint["block"] += 1
+                    if is_block:
+                        if element in rice_split_line:
+                            current_stint["block"] += 1
+                        elif element in opp_split_line:
+                            pass
                     is_steal = re.match(steal_pattern, element)
                     if is_steal and element in rice_split_line:
                         current_stint["steal"] += 1
@@ -148,8 +149,11 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
                     if is_turnover and element in rice_split_line:
                         current_stint["turnover"] += 1
                     is_foul = re.match(foul_pattern, element)
-                    if is_foul and element in rice_split_line:
-                        current_stint["foul"] += 1
+                    if is_foul:
+                        if element in rice_split_line:
+                            current_stint["foul"] += 1
+                        elif element in opp_split_line:
+                            current_stint["fouls drawn"] += 1
 
                 elif chopped:
                     missed_shot = re.match(missed_pattern, element)
@@ -195,7 +199,6 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
     return stints
 
 
-
 def format_lineup(set_lineup):
     string_lineup = ""
     for player in set_lineup:
@@ -226,6 +229,9 @@ def format_stints(stints):
                     new_stint["steal"] += stint["steal"]
                     new_stint["turnover"] += stint["turnover"]
                     new_stint["foul"] += stint["foul"]
+                    new_stint["o-rebounds allowed"] += stint["o-rebounds allowed"]
+                    new_stint["d-rebounds allowed"] += stint["d-rebounds allowed"]
+                    new_stint["fouls drawn"] += stint["fouls drawn"]
         else:
             new_stints.append(dict(stint))
             existing_lineups.append(set(stint["lineup"]))
@@ -285,20 +291,18 @@ def format_stints(stints):
         del stint["end time"]
         del stint["initial points scored"]
         del stint["initial points allowed"]
-        del stint["total rebound against"]
-
     return new_stints
 
 
 def csvify(stints):
-    csv_rows = [["Lineup", "Min", "Pts", "Oppo. Pts", "Diff.", "REB Diff.", "FGM", "FGA", "3PM", "3PA", "AST", "D-Reb", "O-Reb", "REB", "FGP", "3P%", "eFG%", "BK", "STL", "TO", "Fouls Against", "DREB%", "OREB%", "Opp. FG%", "Opp. 3P%", "Opp. eFG%"]]
+    csv_rows = [["Lineup", "Min", "Pts", "Oppo. Pts", "Diff.", "REB Diff.", "FGM", "FGA", "3PM", "3PA", "AST", "D-Reb", "O-Reb","REB", "D-RebA", "O-RebA", "REBA", "FGP", "3P%", "eFG%", "BK", "STL", "TO", "Fouls Against", "Fouls Drawn", "DREB%", "OREB%", "Opp. FG%", "Opp. 3P%", "Opp. eFG%"]]
     for stint in stints:
         csv_row = [stint["lineup"], stint["lasting time"], stint["points scored"], stint["points allowed"],
                    stint["point diff."], stint["rebound diff."],
                    stint["field goal made"], stint["field goal attempt"], stint["three point made"], stint["three point attempt"],
                    stint["assist"], stint["defensive rebound"], stint["offensive rebound"],
-                   stint["total rebound"], stint["fgp"], stint["3pointper"], stint["efgp"], stint["block"], stint["steal"],
-                   stint["turnover"], stint["foul"], stint["DREB%"], stint["OREB%"],
+                   stint["total rebound"], stint["d-rebounds allowed"], stint["o-rebounds allowed"], stint["total rebound against"], stint["fgp"], stint["3pointper"], stint["efgp"], stint["block"], stint["steal"],
+                   stint["turnover"], stint["foul"], stint["fouls drawn"], stint["DREB%"], stint["OREB%"],
                    stint["fgpAgainst"], stint["3pointperAgainst"], stint["efgpAgainst"]]
         csv_rows.append(csv_row)
     for row in csv_rows:
@@ -331,9 +335,7 @@ def run(url, half_time_points_scored, half_time_points_allowed, rice_is_home, li
             second_half_text = second_half_text[:ot_index]
 
     # Scrape them separately
-    #raw_stints = scrape(first_half_text, set(lineup), rice_is_home)
     raw_stints = scrape(first_half_text, set(lineup), rice_is_home)
-    #raw_stints.extend(scrape(second_half_text, set(lineup), rice_is_home, half_time_points_scored, half_time_points_allowed))
     raw_stints.extend(scrape(second_half_text, set(lineup), rice_is_home, half_time_points_scored, half_time_points_allowed))
     if overtime:
         raw_stints.extend(
