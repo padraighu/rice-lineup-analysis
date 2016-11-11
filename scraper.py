@@ -110,9 +110,16 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
                     if missed_shot:
                         # We don't want to count free throws.
                         current_stint["field goal attempt"] += 1
+                        is_3 = rice_split_line[rice_split_line.index(element) + 1] == "3"
+                        if is_3:
+                            current_stint["three point attempt"] += 1
                     elif made_shot:
                         current_stint["field goal attempt"] += 1
                         current_stint["field goal made"] += 1
+                        is_3 = rice_split_line[rice_split_line.index(element) + 1] == "3"
+                        if is_3:
+                            current_stint["three point attempt"] += 1
+                            current_stint["three point made"] += 1
 
                     # TODO add 3pts 
                     if re.match(rebound_pattern, element):
@@ -129,19 +136,19 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
                         elif def_reb:
                             current_stint["defensive rebound"] += 1
                     is_assist = re.match(assist_pattern, element)
-                    if is_assist:
+                    if is_assist and element in rice_split_line:
                         current_stint["assist"] += 1
                     is_block = re.match(block_pattern, element)
-                    if is_block:
+                    if is_block and element in rice_split_line:
                         current_stint["block"] += 1
                     is_steal = re.match(steal_pattern, element)
-                    if is_steal:
+                    if is_steal and element in rice_split_line:
                         current_stint["steal"] += 1
                     is_turnover = re.match(turnover_pattern, element)
-                    if is_turnover:
+                    if is_turnover and element in rice_split_line:
                         current_stint["turnover"] += 1
                     is_foul = re.match(foul_pattern, element)
-                    if is_foul:
+                    if is_foul and element in rice_split_line:
                         current_stint["foul"] += 1
 
                 elif chopped:
@@ -169,19 +176,19 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
                         elif def_reb:
                             current_stint["defensive rebound"] += 1
                     is_assist = re.match(assist_pattern, element)
-                    if is_assist:
+                    if is_assist and element in rice_split_line:
                         current_stint["assist"] += 1
                     is_block = re.match(block_pattern, element)
-                    if is_block:
+                    if is_block and element in rice_split_line:
                         current_stint["block"] += 1
                     is_steal = re.match(steal_pattern, element)
-                    if is_steal:
+                    if is_steal and element in rice_split_line:
                         current_stint["steal"] += 1
                     is_turnover = re.match(turnover_pattern, element)
-                    if is_turnover:
+                    if is_turnover and element in rice_split_line:
                         current_stint["turnover"] += 1
                     is_foul = re.match(foul_pattern, element)
-                    if is_foul:
+                    if is_foul and element in rice_split_line:
                         current_stint["foul"] += 1
     current_stint["lasting time"] = current_stint["begin time"]
     stints.append(current_stint)
