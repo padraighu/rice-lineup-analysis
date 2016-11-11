@@ -7,14 +7,14 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
     RICE_IS_HOME = rice_is_home
     current_lineup = lineup
     current_stint = {"lineup": tuple(current_lineup), "points scored": 0, "points allowed": 0, "o-rebounds allowed": 0,
-                     "d-rebounds allowed":0, "fouls drawn":0, "shots against":0, "made shots against":0,
-                     "threes against":0, "made threes against": 0,
+                     "d-rebounds allowed": 0, "fouls drawn": 0, "shots against": 0, "made shots against": 0,
+                     "threes against": 0, "made threes against": 0,
                      "begin time": datetime.timedelta(0, 0, minutes=20),
                      "end time": datetime.timedelta(0, 0, minutes=20),
                      "lasting time": None, "initial points scored": points_scored, "initial points allowed": points_allowed,
-                     "field goal attempt": 0, "field goal made": 0, "three point attempt":0, "three point made":0,
-                     "offensive rebound": 0, "defensive rebound": 0, "assist": 0, "block":0,
-                     "steal":0, "turnover":0, "foul":0, "opponent block" : 0}
+                     "field goal attempt": 0, "field goal made": 0, "three point attempt": 0, "three point made": 0,
+                     "offensive rebound": 0, "defensive rebound": 0, "assist": 0, "block": 0,
+                     "steal": 0, "turnover": 0, "foul": 0, "opponent block": 0}
     pattern = re.compile(":[^A-Za-z]+")
     score_pattern = re.compile("[0-9]-[0-9]")
     made_pattern = re.compile("GOOD!")
@@ -34,7 +34,6 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
         is_log = re.search(pattern, line)
         if is_log:
             split_line = line.split()
-            chopped = False
             for element in split_line:
                 is_score = re.search(score_pattern, element)
                 is_time = re.search(pattern, element)
@@ -65,14 +64,14 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
                         if len(current_lineup) == 5:
                             stints.append(current_stint)
                             current_stint = {"lineup": tuple(current_lineup), "points scored": 0, "points allowed": 0, "o-rebounds allowed": 0,
-                                            "d-rebounds allowed":0, "fouls drawn":0, "shots against":0, "made shots against":0,
-                                            "threes against":0, "made threes against": 0,
+                                            "d-rebounds allowed": 0, "fouls drawn": 0, "shots against": 0, "made shots against": 0,
+                                            "threes against": 0, "made threes against": 0,
                                             "begin time": datetime.timedelta(0, game_time.total_seconds()),
                                             "end time": datetime.timedelta(0, game_time.total_seconds()),
                                             "lasting time": None, "initial points scored": points_scored, "initial points allowed": points_allowed,
-                                            "field goal attempt": 0, "field goal made": 0, "three point attempt":0, "three point made":0,
-                                            "offensive rebound": 0, "defensive rebound": 0, "assist": 0, "block":0,
-                                            "steal":0, "turnover":0, "foul":0, "opponent block" : 0}
+                                            "field goal attempt": 0, "field goal made": 0, "three point attempt": 0, "three point made": 0,
+                                            "offensive rebound": 0, "defensive rebound": 0, "assist": 0, "block": 0,
+                                            "steal" :0, "turnover": 0, "foul": 0, "opponent block" : 0}
                             if RICE_IS_HOME:
                                 current_stint["initial points scored"] = home_score
                                 current_stint["initial points allowed"] = away_score
@@ -83,16 +82,15 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
                 game_time_txt = filter(lambda x : re.match(time_pattern, x), split_line)
                 if len(game_time_txt) != 1:
                     break
-                else:
-                    game_time_txt = game_time_txt[0]
-                    game_time_index = split_line.index(game_time_txt) # find game time
+                else: 
+                    game_time_index = split_line.index(game_time_txt[0]) # find game time
                 if RICE_IS_HOME:
                     rice_split_line = split_line[:game_time_index] 
                     opp_split_line = split_line[game_time_index + 1:]
                 else:
                     rice_split_line = split_line[game_time_index + 1:]
                     opp_split_line = split_line[:game_time_index]
-                    # We don't want to count free throws.
+                # We don't want to count free throws.
                 missed_shot = element in rice_split_line and re.match(missed_pattern, element) and rice_split_line[rice_split_line.index(element) + 1] != "FT"
                 made_shot = element in rice_split_line and re.match(made_pattern, element) and rice_split_line[rice_split_line.index(element) + 1] != "FT"
                 if missed_shot:
@@ -122,7 +120,6 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
                     if o_is_3:
                         current_stint["threes against"] += 1
                         current_stint["made threes against"] += 1
-
 
                 if re.match(rebound_pattern, element):
                     if element in rice_split_line:
@@ -165,45 +162,24 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
     stints.append(current_stint)
     return stints
 
-
 def format_lineup(set_lineup):
     string_lineup = ""
     for player in set_lineup:
         string_lineup = string_lineup + player + " "
     return string_lineup[:-1]
 
-
 def format_stints(stints):
+    var_lst = ["points scored", "points allowed", "lasting time", "field goal attempt", "field goal made", "offensive rebound",
+                "defensive rebound", "three point attempt", "three point made", "assist", "block", "steal", "turnover", "foul",
+                "o-rebounds allowed", "d-rebounds allowed", "fouls drawn", "shots against", "made shots against", "threes against",
+                "made threes against", "opponent block"]
     new_stints = []
     existing_lineups = []
     for stint in stints:
         if set(stint["lineup"]) in existing_lineups:
             for new_stint in new_stints:
                 if set(new_stint["lineup"]) == set(stint["lineup"]):
-                    new_stint["points scored"] += stint["points scored"]
-                    new_stint["points allowed"] += stint["points allowed"]
-                    new_stint["lasting time"] += stint["lasting time"]
-                    new_stint["field goal attempt"] += stint["field goal attempt"]
-                    new_stint["field goal made"] += stint["field goal made"]
-                    new_stint["offensive rebound"] += stint["offensive rebound"]
-                    new_stint["defensive rebound"] += stint["defensive rebound"]
-
-                    # NF Attempts at new variables by Nick
-                    new_stint["three point attempt"] += stint["three point attempt"]
-                    new_stint["three point made"] += stint["three point made"]
-                    new_stint["assist"] += stint["assist"]
-                    new_stint["block"] += stint["block"]
-                    new_stint["steal"] += stint["steal"]
-                    new_stint["turnover"] += stint["turnover"]
-                    new_stint["foul"] += stint["foul"]
-                    new_stint["o-rebounds allowed"] += stint["o-rebounds allowed"]
-                    new_stint["d-rebounds allowed"] += stint["d-rebounds allowed"]
-                    new_stint["fouls drawn"] += stint["fouls drawn"]
-                    new_stint["shots against"] += stint["shots against"]
-                    new_stint["made shots against"] += stint["made shots against"]
-                    new_stint["threes against"] += stint["threes against"]
-                    new_stint["made threes against"] += stint["made threes against"]
-                    new_stint["opponent block"] += stint["opponent block"]
+                    new_stint = format_stint_helper(new_stint, stint, var_lst)
         else:
             new_stints.append(dict(stint))
             existing_lineups.append(set(stint["lineup"]))
@@ -215,56 +191,29 @@ def format_stints(stints):
         stint["total rebound"] = stint["offensive rebound"] + stint["defensive rebound"]
         stint["point diff."] = stint["points scored"] - stint["points allowed"]
 
-        # NF Attempts at new variables by Nick
-        if stint["field goal attempt"] == 0:
-            stint["fgp"] = 0
-        else:
-            stint["fgp"] = float(stint["field goal made"]) / stint["field goal attempt"]
-
-        if stint["three point attempt"] == 0:
-            stint["3pointper"] = 0
-        else:
-            stint["3pointper"] = float(stint["three point made"]) / stint["three point attempt"]
-
-        if stint["field goal attempt"] == 0:
-            stint["efgp"] = 0
-        else:
-            stint["efgp"] = (stint["field goal made"] + 0.5 * stint["three point made"]) / float(stint["field goal attempt"])
-
-        if stint["shots against"] == 0:
-            stint["fgpAgainst"] = 0
-        else:
-            stint["fgpAgainst"] = float(stint["made shots against"]) / stint["shots against"]
-
-        if stint["threes against"] == 0:
-            stint["3pointperAgainst"] = 0
-        else:
-            stint["3pointperAgainst"] = float(stint["made threes against"]) / stint["threes against"]
-
-        if stint["shots against"] == 0:
-            stint["efgpAgainst"] = 0
-        else:
-            stint["efgpAgainst"] = (stint["made shots against"] + 0.5 * stint["made threes against"]) / float(stint["shots against"])
-
+        # # NF Attempts at new variables by Nick
+        stint["fgp"] = 0 if stint["field goal attempt"] == 0 else float(stint["field goal made"]) / stint["field goal attempt"]
+        stint["3pointper"] = 0 if stint["three point attempt"] == 0 else float(stint["three point made"]) / stint["three point attempt"]
+        stint["efgp"] = 0 if stint["field goal attempt"] == 0 else (stint["field goal made"] + 0.5 * stint["three point made"]) / float(stint["field goal attempt"])
+ 
+        stint["fgpAgainst"] = 0 if stint["shots against"] == 0 else float(stint["made shots against"]) / stint["shots against"]
+        stint["3pointperAgainst"] = 0 if stint["threes against"] == 0 else float(stint["made threes against"]) / stint["threes against"]
+        stint["efgpAgainst"] = 0 if stint["shots against"] == 0 else (stint["made shots against"] + 0.5 * stint["made threes against"]) / float(stint["shots against"])
 
         stint["total rebound against"] = stint["o-rebounds allowed"] + stint["d-rebounds allowed"]
         stint["rebound diff."] = stint["total rebound"] - stint["total rebound against"]
-
-        if (stint["o-rebounds allowed"] + stint["defensive rebound"]) == 0:
-            stint["DREB%"] = 0
-        else:
-            stint["DREB%"] = float(stint["defensive rebound"]) / (stint["o-rebounds allowed"] + stint["defensive rebound"])
-
-        if (stint["d-rebounds allowed"] + stint["offensive rebound"]) == 0:
-            stint["OREB%"] = 0
-        else:
-            stint["OREB%"] = float(stint["offensive rebound"]) / (stint["d-rebounds allowed"] + stint["offensive rebound"])
+        stint["DREB%"] = 0 if (stint["o-rebounds allowed"] + stint["defensive rebound"]) == 0 else float(stint["defensive rebound"]) / (stint["o-rebounds allowed"] + stint["defensive rebound"])
+        stint["OREB%"] = 0 if (stint["d-rebounds allowed"] + stint["offensive rebound"]) == 0 else float(stint["offensive rebound"]) / (stint["d-rebounds allowed"] + stint["offensive rebound"])
         del stint["begin time"]
         del stint["end time"]
         del stint["initial points scored"]
         del stint["initial points allowed"]
     return new_stints
 
+def format_stint_helper(new_stint, stint, variable_lst):
+    for variable in variable_lst:
+        new_stint[variable] += stint[variable]
+    return new_stint
 
 def csvify(stints):
     csv_rows = [["Lineup", "Min", "Pts", "Oppo. Pts", "Diff.", "REB Diff.", "FGM", "FGA", "3PM", "3PA", "Opp. FGM", "Opp. FGA", "Opp. 3PM", "Opp. 3PA", "AST", "D-Reb", "O-Reb","REB", "Opp. D-Reb", "Opp. O-Reb", "Opp. REB", "FGP", "3P%", "eFG%", "BK", "STL", "TO", "Fouls Committed", "Fouls Drawn", "DREB%", "OREB%", "Opp. FG%", "Opp. 3P%", "Opp. eFG%", "Opp. BLK"]]
@@ -282,7 +231,6 @@ def csvify(stints):
         for element in row:
             str_row = str_row + str(element) + ", "
         print(str_row)
-
 
 def run(url, half_time_points_scored, half_time_points_allowed, rice_is_home, lineup, overtime_points_scored=None):
     soup = BeautifulSoup(urlopen(url), "html.parser")
@@ -315,7 +263,6 @@ def run(url, half_time_points_scored, half_time_points_allowed, rice_is_home, li
                    overtime_points_scored, overtime_points_scored))
     clean_stints = format_stints(raw_stints)
     csvify(clean_stints)
-
 
 if __name__ == "__main__":
     # away and overtime case
