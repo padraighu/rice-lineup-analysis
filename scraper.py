@@ -28,8 +28,13 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
     time_pattern = re.compile("[0-9]{2}:[0-9]{2}")
 
     stints = []
-    home_score = 0
-    away_score = 0
+    if RICE_IS_HOME:
+        home_score = points_scored
+        away_score = points_allowed
+    else:
+        home_score = points_allowed
+        away_score = points_scored
+
     for line in split_text:
         is_log = re.search(pattern, line)
         if is_log:
@@ -37,12 +42,26 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
             for element in split_line:
                 is_score = re.search(score_pattern, element)
                 is_time = re.search(pattern, element)
+                game_time_txt = filter(lambda x : re.match(time_pattern, x), split_line)
+                if len(game_time_txt) != 1:
+                    break
+                else: 
+                    game_time_index = split_line.index(game_time_txt[0]) # find game time
+                if RICE_IS_HOME:
+                    rice_split_line = split_line[:game_time_index] 
+                    opp_split_line = split_line[game_time_index + 1:]
+                else:
+                    rice_split_line = split_line[game_time_index + 1:]
+                    opp_split_line = split_line[:game_time_index]
+
                 if is_score:
                     current_score = element
                     dash_index = current_score.index("-")
                     home_score = int(current_score[:dash_index])
+                    print current_score, home_score
                     away_score = int(current_score[dash_index + 1:])
                     if RICE_IS_HOME:
+                        #print home_score, current_stint["initial points scored"], home_score - current_stint["initial points scored"]
                         current_stint["points scored"] = home_score - current_stint["initial points scored"]
                         current_stint["points allowed"] = away_score - current_stint["initial points allowed"]
                     else:
@@ -73,23 +92,13 @@ def scrape(split_text, lineup, rice_is_home, points_scored=0, points_allowed=0):
                                             "offensive rebound": 0, "defensive rebound": 0, "assist": 0, "block": 0,
                                             "steal" :0, "turnover": 0, "foul": 0, "opponent block" : 0}
                             if RICE_IS_HOME:
+                                print "hi", home_score
                                 current_stint["initial points scored"] = home_score
                                 current_stint["initial points allowed"] = away_score
                             else:
                                 current_stint["initial points scored"] = away_score
                                 current_stint["initial points allowed"] = home_score
 
-                game_time_txt = filter(lambda x : re.match(time_pattern, x), split_line)
-                if len(game_time_txt) != 1:
-                    break
-                else: 
-                    game_time_index = split_line.index(game_time_txt[0]) # find game time
-                if RICE_IS_HOME:
-                    rice_split_line = split_line[:game_time_index] 
-                    opp_split_line = split_line[game_time_index + 1:]
-                else:
-                    rice_split_line = split_line[game_time_index + 1:]
-                    opp_split_line = split_line[:game_time_index]
                 # We don't want to count free throws.
                 missed_shot = element in rice_split_line and re.match(missed_pattern, element) and rice_split_line[rice_split_line.index(element) + 1] != "FT"
                 made_shot = element in rice_split_line and re.match(made_pattern, element) and rice_split_line[rice_split_line.index(element) + 1] != "FT"
@@ -256,6 +265,7 @@ def run(url, half_time_points_scored, half_time_points_allowed, rice_is_home, li
 
     # Scrape them separately
     raw_stints = scrape(first_half_text, set(lineup), rice_is_home)
+    #csvify(format_stints(raw_stints))
     raw_stints.extend(scrape(second_half_text, set(lineup), rice_is_home, half_time_points_scored, half_time_points_allowed))
     if overtime:
         raw_stints.extend(
@@ -265,6 +275,27 @@ def run(url, half_time_points_scored, half_time_points_allowed, rice_is_home, li
     csvify(clean_stints)
 
 if __name__ == "__main__":
+    # # home case
+    # url = "http://www.riceowls.com/sports/m-baskbl/stats/2015-2016/rice0220.html"
+    # hps = 52
+    # hpa = 34
+    # rice_is_home = True
+    # overtime = False
+    # ops = 0
+    # starting_lineup = set(["Koulechov", "Drone", "Guercy", "Cashaw", "Evans"])
+    # exhitbition
+    url = "http://www.riceowls.com/sports/m-baskbl/stats/2016-2017/exh01.html"
+    hps = 42
+    hpa = 43
+    rice_is_home = True
+    overtime = False
+    ops = 0
+    starting_lineup = set(["Cashaw", "Koulechov", "Drone", "Lott", "Jackson"])
+    if not overtime:
+        run(url, hps, hpa, rice_is_home, starting_lineup)
+    else:
+        run(url, hps, hpa, rice_is_home, starting_lineup, ops)
+
     # away and overtime case
     url = "http://www.riceowls.com/sports/m-baskbl/stats/2015-2016/rice0225.html"
     hps = 28
@@ -273,16 +304,4 @@ if __name__ == "__main__":
     overtime = True
     ops = 66
     starting_lineup = set(["Koulechov", "Drone", "Guercy", "Cashaw", "Evans"])
-    if not overtime:
-        run(url, hps, hpa, rice_is_home, starting_lineup)
-    else:
-        run(url, hps, hpa, rice_is_home, starting_lineup, ops)
  
-# home case
-url = "http://www.riceowls.com/sports/m-baskbl/stats/2015-2016/rice0220.html"
-hps = 52
-hpa = 34
-rice_is_home = True
-overtime = False
-ops = 0
-starting_lineup = set(["Koulechov", "Drone", "Guercy", "Cashaw", "Evans"])
